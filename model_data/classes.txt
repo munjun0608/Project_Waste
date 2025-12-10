@@ -1,0 +1,14 @@
+Battery_Clean
+Can_Clean
+Can_Dirty
+Glass_Clean
+Glass_Dirty
+PET_Clean
+PET_Dirty
+Paper_Clean
+Paper_Dirty
+Plastic_Clean
+Plastic_Dirty
+Styrofoam_Dirty
+Vinyl_Clean
+Vinyl_Dirty
