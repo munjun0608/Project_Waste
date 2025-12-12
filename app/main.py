@@ -19,7 +19,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="버릴까 말까? API", lifespan=lifespan)
 
-# 🔥 [CORS 설정] 모든 주소에서의 접속 허용
+# 🔥 [CORS 설정] 프론트엔드 연결 허용
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -28,7 +28,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- 1. AI 분석 API ---
+# --- 1. AI 분석 API (DB 저장 로직 삭제됨) ---
 @app.post("/api/predict", response_model=AIAnalysisResponse, tags=["AI Feature"])
 async def predict_waste_image(file: UploadFile = File(...)):
     # 이미지 읽기
@@ -52,6 +52,7 @@ async def predict_waste_image(file: UploadFile = File(...)):
             
     msg = "세척 필요!" if is_dirty else "깨끗합니다."
 
+    # DB 저장 없이 바로 결과 반환
     return AIAnalysisResponse(
         category=category,
         is_dirty=is_dirty,
@@ -71,9 +72,8 @@ async def get_recycling_guide():
 
 @app.get("/")
 def read_root():
-    return {"message": "Server is running (Open to Network)"}
+    return {"message": "Server is running (No DB Mode)"}
 
 if __name__ == "__main__":
     import uvicorn
-    # 👇 [수정됨] host를 "0.0.0.0"으로 설정하여 외부 접속 허용
-    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("app.main:app", host="127.0.0.1", port=8000, reload=True)
