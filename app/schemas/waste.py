@@ -20,14 +20,3 @@ class CleanHouseInfo(BaseModel):
     operating_hours: str
     # [수정] 호환성 문제를 위해 List 대신 list 사용
     today_recycling: list[str]
-
-# 3. [DB] 히스토리 응답 모델
-class HistoryResponse(BaseModel):
-    id: int
-    category: str
-    is_dirty: bool
-    confidence: float
-    created_at: datetime
-
-    class Config:
-        from_attributes = True
