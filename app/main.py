@@ -31,41 +31,67 @@ app.add_middleware(
 @app.post("/api/predict", response_model=AIAnalysisResponse, tags=["AI Feature"])
 async def predict_waste_image(file: UploadFile = File(...)):
     """
-    [기능] 사진을 업로드하면 쓰레기 종류를 분석해줍니다. (새 모델 적용)
+    [기능] AI 분석 후, 프론트엔드에 표시할 '배출 꿀팁(Tip)' 메시지를 반환합니다.
     """
     content = await file.read()
     
     # 1. AI 모델 추론
     label_text, conf = waste_classifier.predict_image(content)
     
+    # 예외 처리: 분석 실패 시
     if not label_text:
-        raise HTTPException(status_code=500, detail="분석 실패")
-    
-    # 2. 결과 메시지 생성 (새 데이터셋은 'Can', 'Glass' 등 재질 이름만 나옴)
-    # 기존의 '_' 분리 로직 제거 -> 재질 그대로 사용
-    category = label_text  # 예: "Can", "Plastic"
-    
-    # 새 모델은 오염 여부를 학습하지 않았으므로 기본값 False 처리
-    is_dirty = False 
-    
-    # 메시지 커스터마이징 (한글 매핑 추천)
-    korean_names = {
-        "Can": "캔류",
-        "Glass": "유리",
-        "Paper": "종이류",
-        "PET": "페트",
-        "Plastic": "플라스틱",
-        "Styrofoam": "스티로폼",
-        "Vinyl": "비닐류"
-    }
-    
-    korean_category = korean_names.get(category, category)
-    msg = f"✅ 분석 결과: {korean_category} ({category}) 입니다."
+        raise HTTPException(status_code=500, detail="이미지 분석에 실패했습니다.")
 
+    # 2. [핵심] 프론트엔드 팁(Tip) 데이터와 1:1 매핑
+    # 기존 프론트엔드 코드에 있던 텍스트를 백엔드로 옮겨왔습니다.
+    waste_info = {
+        "Can": {
+            "type": "캔/고철류",
+            "tip": "내용물을 비우고 헹군 뒤 찌그러뜨려 배출해주세요."
+        },
+        "Glass": {
+            "type": "병류",
+            "tip": "내용물은 비우고 뚜껑을 분리해 배출해주세요."
+        },
+        "Paper": {
+            "type": "종이류",
+            "tip": "테이프 등 이물질을 제거하고 펴서 배출해주세요."
+        },
+        "Plastic": {
+            "type": "플라스틱",
+            "tip": "내용물을 비우고 라벨을 제거한 후 압축해서 버려주세요."
+        },
+        "PET": {
+            "type": "플라스틱", # PET는 플라스틱 팁과 동일하게 처리
+            "tip": "내용물을 비우고 라벨을 제거한 후 압축해서 버려주세요."
+        },
+        "Styrofoam": {
+            "type": "스티로폼",
+            "tip": "테이프와 운송장을 제거하고 흰색의 깨끗한 것만 모아 배출해주세요."
+        },
+        "Vinyl": {
+            "type": "비닐류",
+            "tip": "이물질을 씻어내고 흩날리지 않게 한곳에 모아 배출해주세요."
+        }
+    }
+
+    # 3. 매핑 정보 가져오기
+    info = waste_info.get(label_text)
+    
+    # 기본값 설정 (혹시 모를 에러 방지)
+    final_type = label_text
+    final_msg = "분리배출 방법을 찾을 수 없습니다."
+
+    if info:
+        final_type = info["type"]   # 예: "캔/고철류"
+        final_msg = info["tip"]     # 예: "내용물을 비우고..."
+
+    # 4. 결과 반환
+    # 이제 프론트엔드는 message만 보여주면 됩니다.
     return AIAnalysisResponse(
-        category=category,
-        is_dirty=is_dirty,   # 항상 False (모델 기능 한계)
-        message=msg,
+        category=label_text,    # 영어 코드 (아이콘 매칭용)
+        is_dirty=False,         # 사용 안 함 (고정)
+        message=final_msg,      # ✨ 완성된 꿀팁 메시지
         confidence=conf
     )
 
