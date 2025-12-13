@@ -14,8 +14,7 @@ async def lifespan(app: FastAPI):
     waste_classifier.load_model()
     yield
 
-# 앱 초기화
-app = FastAPI(title="버릴까 말까? API Server", lifespan=lifespan)
+app = FastAPI(title="버릴까 말까? API", lifespan=lifespan)
 
 # --- [수정 완료] CORS 설정 (모든 곳에서 접속 허용) ---
 app.add_middleware(
@@ -40,7 +39,7 @@ async def predict_waste_image(file: UploadFile = File(...)):
     label_text, conf = waste_classifier.predict_image(content)
     
     if not label_text:
-        raise HTTPException(status_code=500, detail="이미지 분석에 실패했습니다.")
+        raise HTTPException(status_code=500, detail="분석 실패")
     
     # 2. 결과 메시지 생성 (새 데이터셋은 'Can', 'Glass' 등 재질 이름만 나옴)
     # 기존의 '_' 분리 로직 제거 -> 재질 그대로 사용
@@ -70,7 +69,7 @@ async def predict_waste_image(file: UploadFile = File(...)):
         confidence=conf
     )
 
-# --- 2. 내 주변 클린하우스 API ---
+# --- 2. 클린하우스 조회 ---
 @app.get("/api/clean-houses", response_model=List[CleanHouseInfo], tags=["Location Feature"])
 async def get_nearby_houses(
     lat: float = Query(..., description="사용자 위도"),
@@ -78,15 +77,14 @@ async def get_nearby_houses(
 ):
     return cleanhouse_service.get_nearest_cleanhouses(lat, lng)
 
-# --- 3. 요일별 배출 가이드 API ---
+# --- 3. 가이드 API ---
 @app.get("/api/guide", tags=["Info Feature"])
 async def get_recycling_guide():
     return cleanhouse_service.get_guide()
 
-# 기본 접속 테스트용
 @app.get("/")
 def read_root():
-    return {"message": "버릴까 말까? 서버가 정상적으로 실행 중입니다."}
+    return {"message": "Server is running (Open to Network)"}
 
 if __name__ == "__main__":
     import uvicorn
