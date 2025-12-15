@@ -18,7 +18,7 @@ class WasteClassifier:
         self.model = None
         self.class_names = []
         
-        # 이미지 전처리 설정 (학습 때와 100% 동일해야 함)
+        # 이미지 전처리 설정 (학습 코드인 train.py와 100% 동일하게 맞춰야 성능이 나옵니다)
         self.transform = transforms.Compose([
             transforms.Resize((224, 224)),
             transforms.ToTensor(),
@@ -26,60 +26,74 @@ class WasteClassifier:
         ])
 
     def load_model(self):
-        """서버 시작 시 모델과 클래스 정보를 로드합니다."""
-        print(f"🔄 AI 모델 로딩 중... ({MODEL_PATH})")
+        """서버 시작 시 모델과 클래스 정보를 메모리에 올립니다."""
+        print(f"🔄 AI 모델 로딩 시작... (경로: {MODEL_PATH})")
         
-        # 1. 클래스 이름 읽기
+        # 1. 클래스 이름 읽기 (classes.txt)
         if os.path.exists(CLASSES_PATH):
             with open(CLASSES_PATH, "r", encoding="utf-8") as f:
                 self.class_names = [line.strip() for line in f.readlines()]
+            print(f"   ✅ 클래스 목록 로드됨: {self.class_names}")
         else:
-            print(f"⚠️ 오류: classes.txt 파일을 찾을 수 없습니다.")
+            print(f"   ❌ 오류: classes.txt를 찾을 수 없습니다! 경로: {CLASSES_PATH}")
             return
 
         # 2. 모델 뼈대 생성 (MobileNetV3 Large)
-        self.model = models.mobilenet_v3_large(weights=None)
-        
-        # 3. 출력층(Classifier) 교체
-        num_classes = len(self.class_names)
-        num_ftrs = self.model.classifier[3].in_features
-        self.model.classifier[3] = nn.Linear(num_ftrs, num_classes)
-        
-        # 4. 학습된 가중치 로드
-        if os.path.exists(MODEL_PATH):
-            try:
+        try:
+            # pretrained=False: 우리는 직접 학습한 가중치를 쓸 것이므로 빈 깡통을 가져옵니다.
+            self.model = models.mobilenet_v3_large(pretrained=False)
+            
+            # 3. 출력층(Classifier) 교체
+            # 학습할 때 사용한 클래스 개수에 맞춰서 마지막 레이어를 수정합니다.
+            num_classes = len(self.class_names)
+            num_ftrs = self.model.classifier[3].in_features
+            self.model.classifier[3] = nn.Linear(num_ftrs, num_classes)
+            
+            # 4. 학습된 가중치(.pth) 주입
+            if os.path.exists(MODEL_PATH):
                 checkpoint = torch.load(MODEL_PATH, map_location=self.device)
                 self.model.load_state_dict(checkpoint)
                 self.model.to(self.device)
-                self.model.eval() # 추론 모드로 전환 (학습 X)
-                print("✅ AI 모델 로드 완료!")
-            except Exception as e:
-                print(f"⚠️ 모델 로드 중 에러 발생: {e}")
-        else:
-            print(f"⚠️ 오류: 모델 파일(.pth)이 없습니다. model_data 폴더를 확인해주세요.")
+                self.model.eval() # 추론 모드로 전환 (필수!)
+                print("   ✨ AI 모델 로드 성공! (준비 완료)")
+            else:
+                print(f"   ❌ 오류: 모델 파일이 없습니다! 경로: {MODEL_PATH}")
+                self.model = None
+
+        except Exception as e:
+            print(f"   ❌ 치명적 오류: 모델 로딩 중 에러 발생\n{e}")
 
     def predict_image(self, image_bytes):
-        """이미지 바이트 데이터를 받아 예측 결과 반환"""
+        """이미지 바이트 데이터를 받아 예측 결과(라벨, 확률)를 반환"""
         if self.model is None:
-            return None, 0.0
+            # 모델이 로드되지 않았으면 다시 로드 시도
+            self.load_model()
+            if self.model is None:
+                return "Error", 0.0
 
         try:
-            # 이미지 열기 및 변환
+            # 1. 이미지 열기 (RGB 변환 필수 - 투명 배경 PNG 대응)
             image = Image.open(io.BytesIO(image_bytes)).convert('RGB')
+            
+            # 2. 전처리 (Resize -> Tensor -> Normalize)
             input_tensor = self.transform(image).unsqueeze(0).to(self.device)
             
-            # 추론 실행
+            # 3. 추론 실행
             with torch.no_grad():
                 outputs = self.model(input_tensor)
+                # Softmax로 확률(%) 계산
                 probabilities = torch.nn.functional.softmax(outputs[0], dim=0)
-                _, preds = torch.max(outputs, 1)
+                confidence, preds = torch.max(probabilities, 0)
                 
             idx = preds.item()
-            return self.class_names[idx], probabilities[idx].item()
+            label = self.class_names[idx]
+            score = confidence.item()
+            
+            return label, score
             
         except Exception as e:
             print(f"예측 중 에러 발생: {e}")
-            return None, 0.0
+            return "Error", 0.0
 
-# 전역 객체 생성 (이 변수를 다른 파일에서 가져다 씁니다)
+# 전역 객체 생성 (main.py에서 import해서 사용함)
 waste_classifier = WasteClassifier()

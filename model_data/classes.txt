@@ -1,7 +1,10 @@
 Can
+Food
+General
 Glass
 PET
 Paper
 Plastic
+Scrap
 Styrofoam
 Vinyl
