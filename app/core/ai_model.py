@@ -18,9 +18,11 @@ class WasteClassifier:
         self.model = None
         self.class_names = []
         
-        # 이미지 전처리 설정 (학습 코드인 train.py와 100% 동일하게 맞춰야 성능이 나옵니다)
+        # 전처리 설정 (실전용: 비율 유지 & 중앙 집중)
+        # 학습 코드와 다르지만, 스마트폰 사진의 비율 왜곡을 막기 위해 필수적인 조치입니다.
         self.transform = transforms.Compose([
-            transforms.Resize((224, 224)),
+            transforms.Resize(256),       # 1. 비율 유지하며 축소
+            transforms.CenterCrop(224),   # 2. 중앙만 잘라냄 (찌그러짐 방지)
             transforms.ToTensor(),
             transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
         ])
