@@ -128,4 +128,5 @@ def read_root():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("app.main:app", host="127.0.0.1", port=8000, reload=True)
+    # 0.0.0.0은 "모든 네트워크(외부 IP 포함)에서의 접속을 허용한다"는 뜻입니다.
+    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)
