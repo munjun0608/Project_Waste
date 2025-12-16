@@ -5,8 +5,12 @@ from typing import List
 
 # 모듈 가져오기
 from app.core.ai_model import waste_classifier
-from app.services.cleanhouse_service import cleanhouse_service
-from app.schemas.waste import AIAnalysisResponse, CleanHouseInfo
+from app.schemas.waste import AIAnalysisResponse
+
+# --- 제한 설정 ---
+# 10MB = 10 * 1024 * 1024 bytes
+MAX_FILE_SIZE = 10 * 1024 * 1024 
+ALLOWED_EXTENSIONS = ["image/jpeg", "image/png", "image/jpg", "image/webp"]
 
 # 서버 수명주기
 @asynccontextmanager
@@ -16,10 +20,10 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="버릴까 말까? API", lifespan=lifespan)
 
-# --- [수정 완료] CORS 설정 (모든 곳에서 접속 허용) ---
+# --- CORS 설정 (모든 곳에서 접속 허용) ---
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],        # 5500, 3000 등 모든 포트 자동 허용
+    allow_origins=["*"],        # 모든 포트 자동 허용
     allow_credentials=False,    # 전체 허용 시에는 반드시 False여야 함
     allow_methods=["*"],
     allow_headers=["*"],
@@ -28,11 +32,25 @@ app.add_middleware(
 # --- 1. AI 분리배출 가이드 API ---
 @app.post("/api/predict", response_model=AIAnalysisResponse, tags=["AI Feature"])
 async def predict_waste_image(file: UploadFile = File(...)):
-    """
-    [기능] AI 분석(10종) -> 프론트엔드 아이콘(8종) 매핑
-    딕셔너리 구조 변경 없이, 리턴할 때만 카테고리를 바꿔줍니다.
-    """
+    
+    # --- 1. 파일 형식(MIME Type) 검사 ---
+    # 파일의 content_type 헤더를 확인
+    if file.content_type not in ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status_code=400, 
+            detail="지원하지 않는 파일 형식입니다. (JPG, PNG, WEBP만 가능)"
+        )
+        
+    
     content = await file.read()
+    
+    # --- 2. 파일 용량 검사 ---
+    # 읽어들인 데이터의 길이(len)가 설정한 크기보다 크면 에러 발생
+    if len(content) > MAX_FILE_SIZE:
+        raise HTTPException(
+            status_code=413, # 413은 '요청 데이터가 너무 큼'을 의미하는 표준 코드
+            detail="파일 크기가 너무 큽니다. (10MB 이하만 가능)"
+        )
     
     # 1. AI 추론 (결과: Can, Scrap, PET, Plastic, Food 등 10개 중 하나)
     label_text, conf = waste_classifier.predict_image(content)
@@ -40,8 +58,7 @@ async def predict_waste_image(file: UploadFile = File(...)):
     if not label_text:
         raise HTTPException(status_code=500, detail="이미지 분석에 실패했습니다.")
 
-    # 2. [팁 정보] 작성자님 기존 스타일 유지 (type, tip만 존재)
-    # AI가 인식하는 10가지 클래스에 대한 각각의 멘트를 적습니다.
+    # AI가 인식하는 10가지 클래스에 대한 각각의 멘트
     waste_info = {
         # --- 캔/고철류 ---
         "Can": {
@@ -84,10 +101,7 @@ async def predict_waste_image(file: UploadFile = File(...)):
         }
     }
 
-    # 3. [핵심] 프론트엔드 아이콘 매핑 (10개 -> 8개)
-    # Scrap이 나오면 프론트엔드에는 'Can'이라고 알려줘야 아이콘이 뜹니다.
-    # PET가 나오면 프론트엔드에는 'Plastic'이라고 알려줍니다.
-    # 나머지는 자기 이름 그대로 씁니다.
+    # 3. 프론트엔드 아이콘 매핑 (10개)
     icon_mapping = {
         "Scrap": "Can",     # 고철 -> 캔 아이콘
         "PET": "Plastic"    # 페트 -> 플라스틱 아이콘
@@ -103,24 +117,11 @@ async def predict_waste_image(file: UploadFile = File(...)):
     # category에는 'frontend_category' (Can, Plastic 등 8개 중 하나)를 넣어서 아이콘 오류 방지
     # message에는 AI가 찾은 디테일한 정보(Scrap 팁 등)를 넣음
     return AIAnalysisResponse(
-        category=frontend_category,   # 여기가 핵심! (Scrap이어도 Can으로 나감)
+        category=frontend_category,   # Scrap이어도 Can으로 나감
         is_dirty=False,
         message=f"[{info['type']}]\n{info['tip']}",
         confidence=conf
     )
-
-# --- 2. 클린하우스 조회 ---
-@app.get("/api/clean-houses", response_model=List[CleanHouseInfo], tags=["Location Feature"])
-async def get_nearby_houses(
-    lat: float = Query(..., description="사용자 위도"),
-    lng: float = Query(..., description="사용자 경도")
-):
-    return cleanhouse_service.get_nearest_cleanhouses(lat, lng)
-
-# --- 3. 가이드 API ---
-@app.get("/api/guide", tags=["Info Feature"])
-async def get_recycling_guide():
-    return cleanhouse_service.get_guide()
 
 @app.get("/")
 def read_root():
@@ -128,5 +129,5 @@ def read_root():
 
 if __name__ == "__main__":
     import uvicorn
-    # 0.0.0.0은 "모든 네트워크(외부 IP 포함)에서의 접속을 허용한다"는 뜻입니다.
+    # 0.0.0.0은 모든 네트워크(외부 IP 포함)에서의 접속을 허용
     uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)

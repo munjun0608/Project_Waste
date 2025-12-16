@@ -6,7 +6,7 @@ import io
 import os
 
 # 파일 경로 자동 설정
-# (현재 파일 위치를 기준으로 model_data 폴더를 찾아갑니다)
+# 현재 파일 위치를 기준으로 model_data 폴더를 찾아감
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 MODEL_PATH = os.path.join(BASE_DIR, "model_data", "best_waste_model.pth")
 CLASSES_PATH = os.path.join(BASE_DIR, "model_data", "classes.txt")
@@ -19,7 +19,7 @@ class WasteClassifier:
         self.class_names = []
         
         # 전처리 설정 (실전용: 비율 유지 & 중앙 집중)
-        # 학습 코드와 다르지만, 스마트폰 사진의 비율 왜곡을 막기 위해 필수적인 조치입니다.
+        # 학습 코드와 다르지만, 스마트폰 사진의 비율 왜곡을 막기 위한 조치
         self.transform = transforms.Compose([
             transforms.Resize(256),       # 1. 비율 유지하며 축소
             transforms.CenterCrop(224),   # 2. 중앙만 잘라냄 (찌그러짐 방지)
@@ -42,11 +42,11 @@ class WasteClassifier:
 
         # 2. 모델 뼈대 생성 (MobileNetV3 Large)
         try:
-            # pretrained=False: 우리는 직접 학습한 가중치를 쓸 것이므로 빈 깡통을 가져옵니다.
+            # pretrained=False: 직접 학습한 가중치를 쓸 것이므로 빈 깡통을 가져오기
             self.model = models.mobilenet_v3_large(pretrained=False)
             
             # 3. 출력층(Classifier) 교체
-            # 학습할 때 사용한 클래스 개수에 맞춰서 마지막 레이어를 수정합니다.
+            # 학습할 때 사용한 클래스 개수에 맞춰서 마지막 레이어를 수정
             num_classes = len(self.class_names)
             num_ftrs = self.model.classifier[3].in_features
             self.model.classifier[3] = nn.Linear(num_ftrs, num_classes)
