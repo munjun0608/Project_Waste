@@ -119,7 +119,7 @@ async def predict_waste_image(file: UploadFile = File(...)):
     return AIAnalysisResponse(
         category=frontend_category,   # Scrap이어도 Can으로 나감
         is_dirty=False,
-        message=f"[{info['type']}]\n{info['tip']}",
+        message=f"\n{info['tip']}",
         confidence=conf
     )
 
