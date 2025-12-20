@@ -1,3 +1,55 @@
+📄 [BE] API 명세서 (API Specification)
+본 문서는 "버릴까 말까?" 서비스의 백엔드 API 명세를 다룹니다.
+
+1. AI 이미지 분석 API
+사용자가 업로드한 쓰레기 이미지를 MobileNetV3 모델을 통해 분석하고, 최적의 분리배출 방법과 카테고리를 반환합니다.
+
+Endpoint: POST /api/predict
+
+Content-Type: multipart/form-data
+
+Request Parameter:
+
+file (UploadFile): 이미지 파일 (JPG, PNG, WEBP 지원)
+
+Constraints:
+
+최대 파일 크기: 10MB
+
+허용 확장자: .jpg, .jpeg, .png, .webp
+
+Response Body (Success)
+AI 모델의 추론 결과와 프론트엔드 아이콘 렌더링을 위한 매핑 데이터를 반환합니다.
+
+필드명   /  타입  / 설명
+category	String	아이콘 표시용 카테고리 (Can, Plastic, Glass, Paper, Styrofoam, Vinyl, Food, General)
+is_dirty	Boolean	오염 여부 (현재 기본값 false 반환)
+message	String	상세 분리배출 가이드 메시지 (예: "내용물을 비우고 헹군 뒤...")
+confidence	Float	AI 예측 신뢰도 (0.0 ~ 1.0)
+Note: AI 내부 클래스 중 Scrap은 Can으로, PET는 Plastic 카테고리로 통합되어 반환됩니다.
+
+2. 기타 정보 API
+서버 상태 확인: GET /
+
+서버의 정상 동작 여부를 확인합니다.
+
+3. 에러 응답 코드
+API 요청 실패 시 반환되는 표준 에러 코드입니다.
+
+상태 코드  / 에러 메시지                  / 발생 원인
+400	        지원하지 않는 파일 형식입니다.	허용되지 않은 확장자 파일 업로드 시
+413	        파일 크기가 너무 큽니다.	      10MB 초과 파일 업로드 시
+500	        이미지 분석에 실패했습니다.	    AI 모델 추론 내부 오류 발생 시
+
+🛠 기술 스택 (Backend)
+Framework: FastAPI
+
+AI Engine: PyTorch (MobileNetV3 Large)
+
+Image Processing: Pillow (PIL)
+
+Documentation: Swagger UI (자동 생성)
+
 📄 프로젝트 리스크 관리 및 문제 해결 보고서 (Backend)
 
 1. 개요
