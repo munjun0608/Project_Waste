@@ -1,0 +1,9 @@
+.git
+__pycache__
+*.pyc
+venv
+.venv
+tests
+scripts
+AI학습
+bench_results
