@@ -27,6 +27,12 @@ def test_root(client):
     assert client.get("/").status_code == 200
 
 
+def test_health_accepts_head(client):
+    # 모니터링 도구(UptimeRobot)는 HEAD 요청을 사용한다
+    assert client.head("/health").status_code == 200
+    assert client.head("/").status_code == 200
+
+
 def test_health_reports_model_loaded(client):
     res = client.get("/health")
     assert res.status_code == 200

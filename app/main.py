@@ -63,15 +63,16 @@ async def predict_waste_image(file: UploadFile = File(...)):
     )
 
 
-@app.get("/")
+@app.api_route("/", methods=["GET", "HEAD"])
 def read_root():
     # 프론트엔드 testConnection()이 사용하는 기존 응답 형식 유지
     return {"message": "Server is running"}
 
 
-@app.get("/health", response_model=HealthResponse)
+@app.api_route("/health", methods=["GET", "HEAD"], response_model=HealthResponse)
 def health():
     # 모니터링/슬립 방지 핑용. 모델까지 준비됐는지 함께 알려준다.
+    # UptimeRobot 등 모니터링 도구는 HEAD 요청을 보내므로 HEAD도 허용한다.
     ready = waste_classifier.is_ready
     if not ready:
         raise HTTPException(status_code=503, detail="model not loaded")
